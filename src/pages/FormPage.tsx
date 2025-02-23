@@ -13,25 +13,53 @@ import {
 } from '@/components/ui/card';
 import { FormData, INITIAL_FORM_STATE } from '../types';
 import { api } from '../api/api';
+import { validateForm } from '../services/formValidator';
 
 const FormPage: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [formData, setFormData] = useState<FormData>(INITIAL_FORM_STATE);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
+  const [isTouched, setIsTouched] = useState<
+    Partial<Record<keyof FormData, boolean>>
+  >({});
+
+  // Revalidate the form whenever formData changes
+  React.useEffect(() => {
+    if (Object.keys(isTouched).length > 0) {
+      const newErrors = validateForm(formData);
+      setErrors(newErrors);
+    }
+  }, [formData, isTouched]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const submissionData = {
-        ...formData,
-        submittedAt: new Date().toISOString(),
-      };
-      const response = await api.submitForm(submissionData);
-      console.log('Form submitted:', response);
-      navigate('/results');
-    } catch (error) {}
+    const newErrors = validateForm(formData);
+    setErrors(newErrors);
+    setIsTouched(
+      Object.keys(formData).reduce(
+        (acc, key) => {
+          acc[key as keyof FormData] = true;
+          return acc;
+        },
+        {} as Record<keyof FormData, boolean>
+      )
+    );
+
+    if (Object.keys(newErrors).length === 0) {
+      try {
+        const submissionData = {
+          ...formData,
+          submittedAt: new Date().toISOString(),
+        };
+        const response = await api.submitForm(submissionData);
+        console.log('Form submitted:', response);
+        navigate('/results');
+      } catch (error) {
+        console.error('Submission error:', error);
+      }
+    }
   };
 
   const handleInputChange = (
@@ -41,9 +69,12 @@ const FormPage: React.FC = () => {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name as keyof FormData]) {
-      setErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
+    setIsTouched((prev) => ({ ...prev, [name]: true }));
+  };
+
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData((prev) => ({ ...prev, privacyConsent: checked }));
+    setIsTouched((prev) => ({ ...prev, privacyConsent: true }));
   };
 
   return (
@@ -67,7 +98,7 @@ const FormPage: React.FC = () => {
                   value={formData.firstName}
                   onChange={handleInputChange}
                 />
-                {errors.firstName && (
+                {isTouched.firstName && errors.firstName && (
                   <span className="text-red-500 text-sm">
                     {errors.firstName}
                   </span>
@@ -81,7 +112,7 @@ const FormPage: React.FC = () => {
                   value={formData.lastName}
                   onChange={handleInputChange}
                 />
-                {errors.lastName && (
+                {isTouched.lastName && errors.lastName && (
                   <span className="text-red-500 text-sm">
                     {errors.lastName}
                   </span>
@@ -101,13 +132,12 @@ const FormPage: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="ABC-12345"
                 />
-                {errors.employeeId && (
+                {isTouched.employeeId && errors.employeeId && (
                   <span className="text-red-500 text-sm">
                     {errors.employeeId}
                   </span>
                 )}
               </div>
-
               <div className="space-y-2">
                 <label htmlFor="phoneNumber">Phone Number</label>
                 <Input
@@ -117,14 +147,13 @@ const FormPage: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="+1 (555) 555-5555"
                 />
-                {errors.phoneNumber && (
+                {isTouched.phoneNumber && errors.phoneNumber && (
                   <span className="text-red-500 text-sm">
                     {errors.phoneNumber}
                   </span>
                 )}
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="salary">Annual Salary</label>
@@ -136,7 +165,7 @@ const FormPage: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="Enter annual salary"
                 />
-                {errors.salary && (
+                {isTouched.salary && errors.salary && (
                   <span className="text-red-500 text-sm">{errors.salary}</span>
                 )}
               </div>
@@ -150,15 +179,13 @@ const FormPage: React.FC = () => {
                   value={formData.startDate}
                   onChange={handleInputChange}
                 />
-                {errors.startDate && (
+                {isTouched.startDate && errors.startDate && (
                   <span className="text-red-500 text-sm">
                     {errors.startDate}
                   </span>
                 )}
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label htmlFor="supervisorEmail">Supervisor Email</label>
                 <Input
@@ -169,7 +196,7 @@ const FormPage: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="supervisor@the4d.ca"
                 />
-                {errors.supervisorEmail && (
+                {isTouched.supervisorEmail && errors.supervisorEmail && (
                   <span className="text-red-500 text-sm">
                     {errors.supervisorEmail}
                   </span>
@@ -185,7 +212,7 @@ const FormPage: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="CC-XXX-YYY"
                 />
-                {errors.costCenter && (
+                {isTouched.costCenter && errors.costCenter && (
                   <span className="text-red-500 text-sm">
                     {errors.costCenter}
                   </span>
@@ -202,7 +229,7 @@ const FormPage: React.FC = () => {
                 onChange={handleInputChange}
                 placeholder="PRJ-2024-001"
               />
-              {errors.projectCode && (
+              {isTouched.projectCode && errors.projectCode && (
                 <span className="text-red-500 text-sm">
                   {errors.projectCode}
                 </span>
@@ -215,19 +242,14 @@ const FormPage: React.FC = () => {
               <Checkbox
                 id="privacyConsent"
                 checked={formData.privacyConsent}
-                onCheckedChange={(checked) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    privacyConsent: checked as boolean,
-                  }));
-                }}
+                onCheckedChange={handleCheckboxChange}
               />
               <label htmlFor="privacyConsent">
                 I acknowledge that this document will be processed according to
                 regional privacy policies and data protection regulations
               </label>
             </div>
-            {errors.privacyConsent && (
+            {isTouched.privacyConsent && errors.privacyConsent && (
               <span className="text-red-500 text-sm">
                 {errors.privacyConsent}
               </span>
@@ -245,6 +267,7 @@ const FormPage: React.FC = () => {
             <Button
               type="submit"
               className="border border-transparent hover:border-green-500"
+              disabled={Object.keys(errors).length > 0}
             >
               Submit Document
             </Button>

@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\"",
-    "server": "node server/index.js",
+    "server": "node --watch server/index.js",
     "dev:full": "concurrently \"npm run dev\" \"npm run server\"",
     "start": "node server/index.js",
     "test:wdio": "wdio run wdio.conf.ts",
