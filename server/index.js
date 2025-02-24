@@ -147,9 +147,11 @@ const processTXT = (filePath, res) => {
       return res.status(500).json({ error: 'Failed to process TXT file' });
     }
 
-    const lines = data.split('\n');
-    const results = lines.map((line) => {
+    const lines = data.split('\n').filter((line) => line.trim() !== '');
+
+    lines.forEach((line) => {
       const [
+        id,
         firstName,
         lastName,
         employeeId,
@@ -161,7 +163,9 @@ const processTXT = (filePath, res) => {
         projectCode,
         privacyConsent,
       ] = line.split(',');
-      return {
+
+      submissions.push({
+        id,
         firstName,
         lastName,
         employeeId,
@@ -172,10 +176,8 @@ const processTXT = (filePath, res) => {
         costCenter,
         projectCode,
         privacyConsent: privacyConsent.trim().toLowerCase() === 'true',
-      };
+      });
     });
-
-    submissions.push(results);
 
     fs.unlinkSync(filePath); // Delete the file after processing
     res.json(submissions);
