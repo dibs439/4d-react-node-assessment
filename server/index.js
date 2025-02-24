@@ -3,6 +3,9 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
+import multer from 'multer';
+import fs from 'fs';
+import csv from 'csv-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,6 +14,8 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const upload = multer({ dest: 'uploads/' });
 
 app.use(cors());
 app.use(express.json());
@@ -92,3 +97,87 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// File uploads endpoint
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const filePath = req.file.path;
+  const fileType = req.file.mimetype;
+
+  // Validate file type
+  if (fileType !== 'text/csv' && fileType !== 'text/plain') {
+    fs.unlinkSync(filePath); // Delete the file
+    return res.status(400).json({
+      error: 'Invalid file type. Only CSV and TXT files are allowed.',
+    });
+  }
+
+  // Process the file
+  if (fileType === 'text/csv') {
+    processCSV(filePath, res);
+  } else if (fileType === 'text/plain') {
+    processTXT(filePath, res);
+  }
+});
+
+// Process CSV files
+const processCSV = (filePath, res) => {
+  //const results = [];
+  fs.createReadStream(filePath)
+    .pipe(csv())
+    .on('data', (data) => submissions.push(data))
+    .on('end', () => {
+      fs.unlinkSync(filePath); // Delete the file after processing
+      res.json(submissions);
+    })
+    .on('error', (error) => {
+      fs.unlinkSync(filePath); // Delete the file on error
+      res.status(500).json({ error: 'Failed to process CSV file' });
+    });
+};
+
+// Process TXT files
+const processTXT = (filePath, res) => {
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) {
+      fs.unlinkSync(filePath); // Delete the file on error
+      return res.status(500).json({ error: 'Failed to process TXT file' });
+    }
+
+    const lines = data.split('\n');
+    const results = lines.map((line) => {
+      const [
+        firstName,
+        lastName,
+        employeeId,
+        phoneNumber,
+        salary,
+        startDate,
+        supervisorEmail,
+        costCenter,
+        projectCode,
+        privacyConsent,
+      ] = line.split(',');
+      return {
+        firstName,
+        lastName,
+        employeeId,
+        phoneNumber,
+        salary: parseFloat(salary),
+        startDate,
+        supervisorEmail,
+        costCenter,
+        projectCode,
+        privacyConsent: privacyConsent.trim().toLowerCase() === 'true',
+      };
+    });
+
+    submissions.push(results);
+
+    fs.unlinkSync(filePath); // Delete the file after processing
+    res.json(submissions);
+  });
+};
